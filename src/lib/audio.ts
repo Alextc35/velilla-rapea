@@ -5,10 +5,15 @@ export async function loadAudioBuffer(
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`No se pudo cargar el audio: ${url}`);
+    throw new Error(
+      `No se pudo cargar el audio: ${url}`,
+    );
   }
 
-  const arrayBuffer = await response.arrayBuffer();
+  const arrayBuffer =
+    await response.arrayBuffer();
 
-  return audioContext.decodeAudioData(arrayBuffer);
+  return audioContext.decodeAudioData(
+    arrayBuffer,
+  );
 }
