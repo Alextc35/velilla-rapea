@@ -1,35 +1,21 @@
-import type {
-  RhymeScheme,
-} from "@/types/game";
+import type { RhymeScheme } from "@/types/game";
 
 type RhymeSchemeSelectorProps = {
   value: RhymeScheme;
   disabled?: boolean;
-  onChange: (
-    scheme: RhymeScheme,
-  ) => void;
+  onChange: (scheme: RhymeScheme) => void;
 };
 
 const SCHEMES: {
   value: RhymeScheme;
   label: string;
-  example: string;
+  detail: string;
+  preview: string[];
 }[] = [
-  {
-    value: "AABB",
-    label: "Parejas",
-    example: "A A B B",
-  },
-  {
-    value: "ABAB",
-    label: "Alternada",
-    example: "A B A B",
-  },
-  {
-    value: "AAAA",
-    label: "Monorrima",
-    example: "A A A A",
-  },
+  { value: "AAAA", label: "Monorrima", detail: "Una rima, cuatro barras", preview: ["A", "A", "A", "A"] },
+  { value: "ABAB", label: "Alternada", detail: "Cruza dos rimas", preview: ["A", "B", "A", "B"] },
+  { value: "ABBA", label: "En espejo", detail: "La primera cierra el patrón", preview: ["A", "B", "B", "A"] },
+  { value: "FREE", label: "Libre", detail: "Palabras para abrir camino", preview: ["✳", "✳", "✳", "✳"] },
 ];
 
 export function RhymeSchemeSelector({
@@ -38,63 +24,43 @@ export function RhymeSchemeSelector({
   onChange,
 }: RhymeSchemeSelectorProps) {
   return (
-    <div className="w-full space-y-3">
-      <p className="text-sm font-medium text-neutral-400">
-        Esquema de rima
-      </p>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <fieldset className="format-fieldset" disabled={disabled}>
+      <legend className="field-label">Formato de rima</legend>
+      <div className="format-grid">
         {SCHEMES.map((scheme) => {
-          const isSelected =
-            scheme.value === value;
+          const isSelected = scheme.value === value;
 
           return (
             <button
               key={scheme.value}
               type="button"
-              disabled={disabled}
-              onClick={() =>
-                onChange(
-                  scheme.value,
-                )
-              }
-              className={[
-                "rounded-2xl border px-5 py-4 text-left transition",
-                "disabled:cursor-not-allowed disabled:opacity-50",
-                isSelected
-                  ? "border-white bg-white text-black"
-                  : "border-neutral-800 bg-neutral-900 text-white hover:border-neutral-600",
-              ].join(" ")}
+              aria-pressed={isSelected}
+              onClick={() => onChange(scheme.value)}
+              className={isSelected ? "format-card format-card--selected" : "format-card"}
             >
-              <div className="font-bold">
-                {scheme.value}
-              </div>
-
-              <div
-                className={[
-                  "mt-1 text-sm",
-                  isSelected
-                    ? "text-neutral-600"
-                    : "text-neutral-400",
-                ].join(" ")}
-              >
-                {scheme.label}
-              </div>
-
-              <div
-                className={[
-                  "mt-3 font-mono text-xs tracking-widest",
-                  isSelected
-                    ? "text-neutral-500"
-                    : "text-neutral-600",
-                ].join(" ")}
-              >
-                {scheme.example}
-              </div>
+              <span className="format-card__top">
+                <span className="format-card__scheme">{scheme.value === "FREE" ? "LIBRE" : scheme.value}</span>
+                <span className="format-card__check" aria-hidden="true">{isSelected ? "✓" : ""}</span>
+              </span>
+              <span className="format-card__preview" aria-hidden="true">
+                {scheme.preview.map((letter, index) => (
+                  <span
+                    key={index}
+                    className={[
+                      "format-card__letter",
+                      scheme.value === "FREE" ? "format-card__letter--free" : "format-card__letter--" + letter.toLowerCase(),
+                    ].join(" ")}
+                  >
+                    {letter}
+                  </span>
+                ))}
+              </span>
+              <span className="format-card__label">{scheme.label}</span>
+              <span className="format-card__detail">{scheme.detail}</span>
             </button>
           );
         })}
       </div>
-    </div>
+    </fieldset>
   );
 }

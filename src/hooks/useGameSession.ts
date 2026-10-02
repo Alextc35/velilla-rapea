@@ -14,12 +14,7 @@ import type {
 const INITIAL_SESSION: GameSession = {
   id: 0,
   status: "idle",
-  words: [
-    "casa",
-    "masa",
-    "canción",
-    "pasión",
-  ],
+  words: [],
 };
 
 export function useGameSession(

@@ -48,6 +48,29 @@ export const rhymeFamilies: RhymeFamily[] = [
   },
 ];
 
+const freeWords = [
+  "semáforo",
+  "barrio",
+  "relámpago",
+  "cicatriz",
+  "abuela",
+  "andén",
+  "tormenta",
+  "espejo",
+  "promesa",
+  "kilómetro",
+  "ventana",
+  "domingo",
+  "ceniza",
+  "frontera",
+  "latido",
+  "marea",
+  "azotea",
+  "silencio",
+  "pasaporte",
+  "desvelo",
+];
+
 function shuffle<T>(items: readonly T[]): T[] {
   const result = [...items];
 
@@ -104,6 +127,14 @@ export function createRhymeSequence(
 ): string[] {
   const sequence: string[] = [];
 
+  if (scheme === "FREE") {
+    while (sequence.length < numberOfBars) {
+      sequence.push(...shuffle(freeWords).slice(0, 4));
+    }
+
+    return sequence.slice(0, numberOfBars);
+  }
+
   let previousFamilyIds: string[] = [];
 
   while (
@@ -123,18 +154,6 @@ export function createRhymeSequence(
       familyB.id,
     ];
 
-    if (scheme === "AABB") {
-      const a = pickWords(familyA, 2);
-      const b = pickWords(familyB, 2);
-
-      sequence.push(
-        a[0],
-        a[1],
-        b[0],
-        b[1],
-      );
-    }
-
     if (scheme === "ABAB") {
       const a = pickWords(familyA, 2);
       const b = pickWords(familyB, 2);
@@ -144,6 +163,18 @@ export function createRhymeSequence(
         b[0],
         a[1],
         b[1],
+      );
+    }
+
+    if (scheme === "ABBA") {
+      const a = pickWords(familyA, 2);
+      const b = pickWords(familyB, 2);
+
+      sequence.push(
+        a[0],
+        b[0],
+        b[1],
+        a[1],
       );
     }
 

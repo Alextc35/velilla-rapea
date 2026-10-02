@@ -5,6 +5,7 @@ type PatternGridProps = {
   currentBar: number;
   currentBeat: number;
   isPlaying: boolean;
+  hasCompleted: boolean;
   rhymeScheme: RhymeScheme;
 };
 
@@ -13,128 +14,63 @@ export function PatternGrid({
   currentBar,
   currentBeat,
   isPlaying,
+  hasCompleted,
   rhymeScheme,
 }: PatternGridProps) {
-  const pattern = rhymeScheme.split("");
-
-  const blockStart =
-    Math.floor((currentBar - 1) / 4) * 4;
-
-  const currentGlobalCell =
-    (currentBar - 1) * 4 +
-    (currentBeat - 1);
-
-  const rows = Array.from(
-    { length: 4 },
-    (_, rowIndex) => {
-      const absoluteBarIndex =
-        blockStart + rowIndex;
-
-      return {
-        barNumber:
-          absoluteBarIndex + 1,
-
-        word:
-          words[
-            absoluteBarIndex
-          ] ?? "",
-
-        rhyme:
-          pattern[
-            rowIndex %
-              pattern.length
-          ] ?? "A",
-      };
-    },
-  );
+  const pattern = rhymeScheme === "FREE" ? ["✳", "✳", "✳", "✳"] : rhymeScheme.split("");
+  const blockStart = Math.floor((currentBar - 1) / 4) * 4;
 
   return (
-    <div className="w-full space-y-2">
-      {rows.map(
-        (
-          {
-            barNumber,
-            word,
-            rhyme,
-          },
-          rowIndex,
-        ) => (
+    <div className="pattern-grid" aria-label="Patrón de cuatro barras">
+      {Array.from({ length: 4 }, (_, rowIndex) => {
+        const barIndex = blockStart + rowIndex;
+        const barNumber = barIndex + 1;
+        const isCurrentBar = barNumber === currentBar;
+        const isBarComplete = hasCompleted || barNumber < currentBar;
+        const letter = pattern[rowIndex] ?? "A";
+        const word = words[barIndex] ?? "";
+
+        return (
           <div
             key={barNumber}
-            className="grid grid-cols-[32px_repeat(4,minmax(0,1fr))] gap-2"
+            className={[
+              "bar-row",
+              isBarComplete ? "bar-row--past" : "",
+              isCurrentBar && isPlaying ? "bar-row--current" : "",
+            ].filter(Boolean).join(" ")}
           >
-            <div className="flex items-center justify-center text-xs font-bold text-neutral-600">
-              {rhyme}
+            <div className="bar-row__label">
+              <span className={rhymeScheme === "FREE" ? "rhyme-mark rhyme-mark--free" : "rhyme-mark"}>
+                {letter}
+              </span>
+              <span className="bar-row__number">{String(barNumber).padStart(2, "0")}</span>
             </div>
-
-            {Array.from(
-              { length: 4 },
-              (_, beatIndex) => {
-                const absoluteCell =
-                  (barNumber - 1) *
-                    4 +
-                  beatIndex;
-
-                const isCurrent =
-                  isPlaying &&
-                  absoluteCell ===
-                    currentGlobalCell;
-
-                const isPast =
-                  absoluteCell <
-                  currentGlobalCell;
-
-                const showWord =
-                  beatIndex === 3;
+            <div className="bar-row__beats">
+              {Array.from({ length: 4 }, (_, beatIndex) => {
+                const isCurrentBeat = isCurrentBar && currentBeat === beatIndex + 1 && isPlaying;
+                const isPastBeat = isBarComplete || (isCurrentBar && currentBeat > beatIndex + 1);
+                const showWord = beatIndex === 3 && word;
 
                 return (
                   <div
-                    key={`${barNumber}-${beatIndex}`}
+                    key={beatIndex}
                     className={[
-                      "relative flex h-20 items-center justify-center rounded-xl border transition-all duration-150 sm:h-24",
-
-                      isPast
-                        ? "border-neutral-700 bg-neutral-800 text-neutral-500"
-                        : "",
-
-                      isCurrent
-                        ? "border-white bg-neutral-100 text-black"
-                        : "",
-
-                      !isPast &&
-                      !isCurrent
-                        ? "border-neutral-800 bg-neutral-950 text-neutral-200"
-                        : "",
-                    ].join(" ")}
+                      "beat-cell",
+                      isPastBeat ? "beat-cell--past" : "",
+                      isCurrentBeat ? "beat-cell--current" : "",
+                    ].filter(Boolean).join(" ")}
+                    aria-current={isCurrentBeat ? "step" : undefined}
                   >
-                    {isCurrent && (
-                      <div className="absolute top-3 h-3 w-3 animate-bounce rounded-full bg-black" />
-                    )}
-
-                    {showWord && word && (
-                      <span
-                        className={[
-                          "px-2 text-center text-base font-bold uppercase tracking-tight sm:text-xl",
-
-                          isPast
-                            ? "text-neutral-500"
-                            : "",
-
-                          isCurrent
-                            ? "mt-5 text-black"
-                            : "",
-                        ].join(" ")}
-                      >
-                        {word}
-                      </span>
-                    )}
+                    <span className="beat-cell__count">{beatIndex + 1}</span>
+                    {showWord && <span className="beat-cell__word">{word}</span>}
+                    {isCurrentBeat && <span className="beat-cell__pulse" aria-hidden="true" />}
                   </div>
                 );
-              },
-            )}
+              })}
+            </div>
           </div>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }

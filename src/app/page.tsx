@@ -1,9 +1,8 @@
 import { Game } from "@/components/game/Game";
+import { getBeatLibrary } from "@/lib/beats";
 
-export default function Home() {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-6 text-white">
-      <Game />
-    </main>
-  );
+export default async function Home() {
+  const beats = await getBeatLibrary();
+
+  return <Game beats={beats} />;
 }

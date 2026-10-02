@@ -1,437 +1,163 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-
-import { loadAudioBuffer } from "@/lib/audio";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type UseBeatClockOptions = {
   bpm: number;
   audioUrl: string;
   beatsPerBar?: number;
+  numberOfBars?: number;
 };
 
 export function useBeatClock({
   bpm,
   audioUrl,
   beatsPerBar = 4,
+  numberOfBars = 32,
 }: UseBeatClockOptions) {
   const [currentBeat, setCurrentBeat] = useState(1);
   const [currentBar, setCurrentBar] = useState(1);
-
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasCompleted, setHasCompleted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  /*
-   * AudioContext principal.
-   *
-   * Lo reutilizamos durante toda la vida
-   * del componente.
-   */
-  const audioContextRef =
-    useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const loadedAudioUrlRef = useRef<string | null>(null);
+  const startedAtRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const playRequestRef = useRef(0);
 
-  /*
-   * Audio ya descargado y decodificado.
-   *
-   * Así evitamos volver a hacer fetch
-   * cada vez que pulsamos Play.
-   */
-  const audioBufferRef =
-    useRef<AudioBuffer | null>(null);
-
-  /*
-   * Guardamos qué URL corresponde al buffer
-   * actualmente cargado.
-   *
-   * Esto será útil cuando tengamos
-   * selector de beats.
-   */
-  const loadedAudioUrlRef =
-    useRef<string | null>(null);
-
-  /*
-   * AudioBufferSourceNode que está
-   * reproduciendo actualmente.
-   *
-   * Cada reproducción necesita uno nuevo.
-   */
-  const sourceRef =
-    useRef<AudioBufferSourceNode | null>(null);
-
-  /*
-   * Momento exacto del AudioContext
-   * en el que comienza el beat.
-   */
-  const startedAtRef =
-    useRef<number | null>(null);
-
-  /*
-   * requestAnimationFrame utilizado
-   * para actualizar la interfaz.
-   */
-  const animationFrameRef =
-    useRef<number | null>(null);
-
-  /**
-   * Detiene el loop visual.
-   */
   const stopAnimationFrame = useCallback(() => {
     if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(
-        animationFrameRef.current,
-      );
-
+      cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
   }, []);
 
-  /**
-   * Detiene únicamente el source de audio
-   * que esté sonando.
-   */
-  const stopAudioSource = useCallback(() => {
-    if (!sourceRef.current) {
-      return;
-    }
-
-    try {
-      sourceRef.current.stop();
-    } catch {
-      /*
-       * Puede ocurrir si el source
-       * ya se había detenido.
-       */
-    }
-
-    sourceRef.current.disconnect();
-    sourceRef.current = null;
-  }, []);
-
-  /**
-   * Detiene completamente la reproducción
-   * y reinicia el reloj del juego.
-   */
   const stop = useCallback(() => {
+    playRequestRef.current += 1;
     stopAnimationFrame();
-    stopAudioSource();
-
     startedAtRef.current = null;
+
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      try {
+        audio.currentTime = 0;
+      } catch {
+        // La pista puede no haber terminado de cargar sus metadatos.
+      }
+    }
 
     setCurrentBeat(1);
     setCurrentBar(1);
     setIsPlaying(false);
-  }, [
-    stopAnimationFrame,
-    stopAudioSource,
-  ]);
+    setIsLoading(false);
+    setHasCompleted(false);
+    setError(null);
+  }, [stopAnimationFrame]);
 
-  /**
-   * Arranca el reloj visual.
-   *
-   * IMPORTANTE:
-   * requestAnimationFrame NO es nuestro
-   * reloj musical.
-   *
-   * El reloj real siempre es:
-   *
-   * AudioContext.currentTime
-   *
-   * requestAnimationFrame simplemente
-   * consulta ese reloj y actualiza React.
-   */
-  const startClock = useCallback(() => {
-    const audioContext =
-      audioContextRef.current;
+  const play = useCallback(async (): Promise<boolean> => {
+    if (isPlaying || isLoading) return false;
 
-    const startedAt =
-      startedAtRef.current;
-
-    if (
-      !audioContext ||
-      startedAt === null
-    ) {
-      return;
-    }
-
-    const secondsPerBeat =
-      60 / bpm;
-
-    const update = () => {
-      const elapsedSeconds =
-        audioContext.currentTime -
-        startedAt;
-
-      /*
-       * El audio se programa ligeramente
-       * en el futuro.
-       *
-       * Mientras todavía no haya llegado
-       * startTime, esperamos.
-       */
-      if (elapsedSeconds < 0) {
-        animationFrameRef.current =
-          requestAnimationFrame(update);
-
-        return;
-      }
-
-      /*
-       * Ejemplo a 4 beats por compás:
-       *
-       * absoluteBeat = 0 → beat 1, compás 1
-       * absoluteBeat = 1 → beat 2, compás 1
-       * absoluteBeat = 2 → beat 3, compás 1
-       * absoluteBeat = 3 → beat 4, compás 1
-       * absoluteBeat = 4 → beat 1, compás 2
-       */
-      const absoluteBeat =
-        Math.floor(
-          elapsedSeconds /
-            secondsPerBeat,
-        );
-
-      const beat =
-        (absoluteBeat %
-          beatsPerBar) +
-        1;
-
-      const bar =
-        Math.floor(
-          absoluteBeat /
-            beatsPerBar,
-        ) + 1;
-
-      /*
-       * Evitamos actualizaciones de estado
-       * innecesarias si seguimos dentro
-       * del mismo beat.
-       */
-      setCurrentBeat(
-        (previousBeat) =>
-          previousBeat === beat
-            ? previousBeat
-            : beat,
-      );
-
-      setCurrentBar(
-        (previousBar) =>
-          previousBar === bar
-            ? previousBar
-            : bar,
-      );
-
-      animationFrameRef.current =
-        requestAnimationFrame(
-          update,
-        );
-    };
-
-    update();
-  }, [
-    bpm,
-    beatsPerBar,
-  ]);
-
-  /**
-   * Prepara y reproduce el audio.
-   */
-  const play = useCallback(async () => {
-    if (isPlaying || isLoading) {
-      return;
-    }
+    const requestId = playRequestRef.current + 1;
+    playRequestRef.current = requestId;
+    setIsLoading(true);
+    setError(null);
+    setHasCompleted(false);
 
     try {
-      setIsLoading(true);
+      let audio = audioRef.current;
 
-      /*
-       * Creamos el AudioContext únicamente
-       * cuando el usuario intenta reproducir.
-       *
-       * Esto evita problemas con las políticas
-       * de autoplay de los navegadores.
-       */
-      let audioContext =
-        audioContextRef.current;
-
-      if (!audioContext) {
-        audioContext =
-          new AudioContext();
-
-        audioContextRef.current =
-          audioContext;
+      if (!audio || loadedAudioUrlRef.current !== audioUrl) {
+        audio?.pause();
+        audio = new Audio(audioUrl);
+        audio.preload = "none";
+        audio.loop = true;
+        audioRef.current = audio;
+        loadedAudioUrlRef.current = audioUrl;
       }
 
-      /*
-       * Algunos navegadores suspenden
-       * automáticamente AudioContext.
-       */
-      if (
-        audioContext.state ===
-        "suspended"
-      ) {
-        await audioContext.resume();
+      audio.loop = true;
+      try {
+        audio.currentTime = 0;
+      } catch {
+        // El navegador inicia desde el principio cuando aún no conoce la duración.
       }
 
-      /*
-       * Si cambia audioUrl en el futuro,
-       * por ejemplo mediante un selector
-       * de beats, invalidamos el buffer.
-       */
-      if (
-        loadedAudioUrlRef.current !==
-        audioUrl
-      ) {
-        audioBufferRef.current = null;
-        loadedAudioUrlRef.current =
-          null;
+      await audio.play();
+      if (playRequestRef.current !== requestId) {
+        audio.pause();
+        return false;
       }
 
-      /*
-       * Descargamos y decodificamos
-       * el beat únicamente si hace falta.
-       */
-      if (!audioBufferRef.current) {
-        audioBufferRef.current =
-          await loadAudioBuffer(
-            audioContext,
-            audioUrl,
-          );
-
-        loadedAudioUrlRef.current =
-          audioUrl;
-      }
-
-      /*
-       * Cada AudioBufferSourceNode
-       * solamente puede iniciarse una vez,
-       * por lo que creamos uno nuevo
-       * para cada partida.
-       */
-      const source =
-        audioContext.createBufferSource();
-
-      source.buffer =
-        audioBufferRef.current;
-
-      /*
-       * Por ahora hacemos loop infinito.
-       *
-       * Cuando implementemos el final
-       * automático de partida, podremos
-       * detenerlo nosotros mismos.
-       */
-      source.loop = true;
-
-      source.connect(
-        audioContext.destination,
-      );
-
-      sourceRef.current = source;
-
-      /*
-       * Programamos el inicio 50 ms
-       * en el futuro.
-       *
-       * El audio y nuestro reloj utilizan
-       * exactamente el mismo startTime.
-       */
-      const startTime =
-        audioContext.currentTime +
-        0.05;
-
-      startedAtRef.current =
-        startTime;
-
-      /*
-       * Reiniciamos el estado visual.
-       */
+      const startedAt = performance.now();
+      startedAtRef.current = startedAt;
       setCurrentBeat(1);
       setCurrentBar(1);
-
-      /*
-       * Programamos el audio.
-       */
-      source.start(startTime);
-
       setIsPlaying(true);
 
-      /*
-       * Comenzamos a consultar el reloj
-       * del AudioContext.
-       */
-      startClock();
-    } catch (error) {
-      console.error(
-        "Error iniciando el motor de audio:",
-        error,
-      );
+      const tick = (now: number) => {
+        const actualStart = startedAtRef.current;
+        if (actualStart === null) return;
 
-      stop();
+        const elapsed = Math.max(0, (now - actualStart) / 1000);
+        const absoluteBeat = Math.floor((elapsed * bpm) / 60);
+        const totalBeats = numberOfBars * beatsPerBar;
+
+        if (absoluteBeat >= totalBeats) {
+          stopAnimationFrame();
+          startedAtRef.current = null;
+          audio?.pause();
+          try {
+            audio.currentTime = 0;
+          } catch {
+            // Ignoramos el reinicio si el navegador aún no ha leído la duración.
+          }
+          setCurrentBeat(beatsPerBar);
+          setCurrentBar(numberOfBars);
+          setIsPlaying(false);
+          setHasCompleted(true);
+          return;
+        }
+
+        setCurrentBeat((absoluteBeat % beatsPerBar) + 1);
+        setCurrentBar(Math.floor(absoluteBeat / beatsPerBar) + 1);
+        animationFrameRef.current = requestAnimationFrame(tick);
+      };
+
+      animationFrameRef.current = requestAnimationFrame(tick);
+      return true;
+    } catch {
+      if (playRequestRef.current === requestId) {
+        setError("No se ha podido reproducir esta base. Comprueba que el archivo contiene audio compatible.");
+        setIsPlaying(false);
+      }
+      return false;
     } finally {
-      setIsLoading(false);
+      if (playRequestRef.current === requestId) setIsLoading(false);
     }
-  }, [
-    audioUrl,
-    isLoading,
-    isPlaying,
-    startClock,
-    stop,
-  ]);
+  }, [audioUrl, beatsPerBar, bpm, isLoading, isPlaying, numberOfBars, stopAnimationFrame]);
 
-  /**
-   * Función cómoda por si queremos
-   * controlar Play/Stop desde un único botón.
-   */
-  const toggle = useCallback(() => {
-    if (isPlaying) {
-      stop();
-      return;
-    }
-
-    void play();
-  }, [
-    isPlaying,
-    play,
-    stop,
-  ]);
-
-  /**
-   * Limpieza cuando Game desaparece
-   * del árbol de React.
-   */
   useEffect(() => {
     return () => {
+      playRequestRef.current += 1;
       stopAnimationFrame();
-      stopAudioSource();
-
       startedAtRef.current = null;
-
-      if (audioContextRef.current) {
-        void audioContextRef.current.close();
-
-        audioContextRef.current =
-          null;
-      }
+      audioRef.current?.pause();
+      audioRef.current = null;
     };
-  }, [
-    stopAnimationFrame,
-    stopAudioSource,
-  ]);
+  }, [stopAnimationFrame]);
 
   return {
     currentBeat,
     currentBar,
-
     isPlaying,
     isLoading,
-
+    hasCompleted,
+    error,
     play,
     stop,
-    toggle,
   };
 }
