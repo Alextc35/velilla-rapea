@@ -18,17 +18,17 @@ El catálogo se descubre desde el contenido de **public/beats/**; no hace falta 
       Nombre del artista/
         channels4_banner.jpg
         1/
-          beat.mp4
+          beat.wav
           hq720.avif
         2/
-          beat.mp4
+          beat.wav
           hq720.avif
 
 Cada subcarpeta numerada representa una base. Se leen miniaturas **hq720.avif** o **hqdefault.avif** y banners **channels4_banner.jpg** (también **.jpeg**, **.png** y **.avif**). Los formatos de pista admitidos son MP4, MP3, M4A, WAV y OGG.
 
 Los estilos se sugieren a partir del título del archivo —por ejemplo, *trap*, *drill*, *boom bap*, *guitarra* o *piano*— y se pueden buscar o filtrar. El catálogo solo asigna BPM cuando el título incluye un valor explícito, como **92 BPM**; la biblioteca permite guardar el tempo correcto a mano y filtrar después por rangos. Ese dato y los favoritos se guardan en el almacenamiento local del navegador.
 
-Las pistas y sus imágenes se sirven desde rutas estáticas como **/beats/Nombre%20del%20artista/1/beat.mp4**. Los MP4 se guardan como archivos normales del repo; se han retirado las dos pistas que superaban el límite de 100 MiB por archivo de GitHub. Quedan 68 bases reproducibles y **public/beats/** ocupa aproximadamente 1,6 GB. La carpeta debe viajar con la aplicación al publicarla. Para probar desde móviles en la misma red, inicia el servidor escuchando en la red local (`npm run dev -- --hostname 0.0.0.0`) y abre en cada móvil la dirección local del ordenador. Para una publicación accesible por Internet, el alojamiento debe admitir el tamaño de la biblioteca.
+Las pistas y sus imágenes se sirven desde rutas estáticas como **/beats/Nombre%20del%20artista/1/beat.wav**. Los 68 beats están en WAV PCM estéreo de 16 bits y 32 kHz para mejorar la compatibilidad de reproducción. Se retiraron las dos pistas originales que superaban el límite de 100 MiB de GitHub; las WAV ocupan 1,56 GiB y ninguna supera ese límite individual. La carpeta debe viajar con la aplicación al publicarla. Para probar desde móviles en la misma red, inicia el servidor escuchando en la red local (`npm run dev -- --hostname 0.0.0.0`) y abre en cada móvil la dirección local del ordenador. Para una publicación accesible por Internet, el alojamiento debe admitir el tamaño de la biblioteca.
 
 ## Ronda de freestyle
 
